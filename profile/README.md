@@ -10,7 +10,7 @@ We build and publish focused examples, documentation systems, commerce tooling, 
 - Documentation sites and developer portals for products, themes, extensions, and open technical guides.
 - Commerce-focused tooling around OpenCart, Shopify, storefront documentation, and extension workflows.
 - Developer experience projects, including VS Code extensions, release tooling, build helpers, and workflow automation.
-- Practical articles and demos for frontend developers, published under the DESIGN4ᴾᴿᴼ name on Medium and DEV.
+- Practical articles and demos for frontend developers, published under the DESIGN4ᴾᴿᴼ name on Medium and Devs.to
 
 ## Featured Repositories
 
