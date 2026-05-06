@@ -18,9 +18,6 @@ We build and publish focused examples, documentation systems, commerce tooling, 
 | --- | --- |
 | [astro-github-support-form](https://github.com/design4pro/astro-github-support-form) | Astro SSR demo that sends website feedback to GitHub Issues through a GitHub App and Cloudflare Turnstile. |
 | [opencart-community](https://github.com/design4pro/opencart-community) | Official documentation site for OpenCart community-oriented materials. |
-| [shopify-theme-khors-docs](https://github.com/design4pro/shopify-theme-khors-docs) | Documentation for Shopify theme work and storefront implementation notes. |
-| [vscode-workspace-manager](https://github.com/design4pro/vscode-workspace-manager) | Visual Studio Code extension for workspace management. |
-| [cz-release-me](https://github.com/design4pro/cz-release-me) | Custom Commitizen adapter for release-oriented workflows. |
 
 ## Engineering Principles
 
