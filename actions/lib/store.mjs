@@ -47,9 +47,12 @@ export function hasGlob(segment) {
   return /[*?]/.test(segment);
 }
 
+// Hidden files and directories are skipped, as upload-artifact does by default
+// (include-hidden-files: false).
 export function walk(dir, out = []) {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
     else if (entry.isFile()) out.push(full);
