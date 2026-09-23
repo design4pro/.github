@@ -1,0 +1,47 @@
+name: Upload artifact (host store or GitHub)
+description: >-
+  Drop-in for actions/upload-artifact. On a self-hosted runner that mounts the artifact store at
+  /ci-artifacts the files stay on the runner host and cost no GitHub storage; anywhere else
+  (GitHub-hosted, Blacksmith, a pool without the mount) the upstream action uploads them as before.
+inputs:
+  name:
+    description: Artifact name.
+    default: artifact
+  path:
+    description: Files, directories or globs to upload, one per line. `!` excludes.
+    required: true
+  if-no-files-found:
+    description: warn, error or ignore.
+    default: warn
+  retention-days:
+    description: >-
+      Passed to GitHub when the upload falls back to it. The host store keeps every run for the
+      host's own retention period instead.
+    default: ''
+runs:
+  using: composite
+  steps:
+    - id: store
+      shell: bash
+      run: |
+        if [ -d "${CI_ARTIFACTS_STORE:-/ci-artifacts}" ] && [ -w "${CI_ARTIFACTS_STORE:-/ci-artifacts}" ]; then
+          echo "host=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "host=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - if: steps.store.outputs.host == 'true'
+      shell: bash
+      env:
+        INPUT_NAME: ${{ inputs.name }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_IF_NO_FILES_FOUND: ${{ inputs.if-no-files-found }}
+      run: node "$GITHUB_ACTION_PATH/upload.mjs"
+
+    - if: steps.store.outputs.host != 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: ${{ inputs.if-no-files-found }}
+        retention-days: ${{ inputs.retention-days }}
