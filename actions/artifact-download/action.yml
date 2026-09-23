@@ -1,0 +1,46 @@
+name: Download artifact (host store or GitHub)
+description: >-
+  Drop-in for actions/download-artifact within one workflow run. Reads from the runner host's
+  /ci-artifacts store when it is mounted, from GitHub otherwise. Both jobs of a hand-off must see
+  the same store, so the uploading and the downloading job must run on the same kind of runner.
+inputs:
+  name:
+    description: A single artifact to download. Omit to download every artifact (or those matching pattern).
+    default: ''
+  pattern:
+    description: Glob over artifact names. Ignored when name is set.
+    default: ''
+  path:
+    description: Destination directory.
+    default: '.'
+  merge-multiple:
+    description: Put the contents of every matched artifact into path itself, not a subdirectory each.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - id: store
+      shell: bash
+      run: |
+        if [ -d "${CI_ARTIFACTS_STORE:-/ci-artifacts}" ] && [ -w "${CI_ARTIFACTS_STORE:-/ci-artifacts}" ]; then
+          echo "host=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "host=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - if: steps.store.outputs.host == 'true'
+      shell: bash
+      env:
+        INPUT_NAME: ${{ inputs.name }}
+        INPUT_PATTERN: ${{ inputs.pattern }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_MERGE_MULTIPLE: ${{ inputs.merge-multiple }}
+      run: node "$GITHUB_ACTION_PATH/download.mjs"
+
+    - if: steps.store.outputs.host != 'true'
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ inputs.name }}
+        pattern: ${{ inputs.pattern }}
+        path: ${{ inputs.path }}
+        merge-multiple: ${{ inputs.merge-multiple }}
