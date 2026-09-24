@@ -1,0 +1,76 @@
+name: Cancel closed PR runs
+
+# Frees the self-hosted pool from runs nobody will read. `concurrency: cancel-in-progress` only
+# fires on the next push, so a merged or closed pull request otherwise keeps its CI and gate runs
+# queued or running for hours.
+#
+# Call it from a `pull_request_target: types: [closed]` workflow. That event fires for fork pull
+# requests too, and this job reads run and pull request metadata through the API only - it never
+# checks out or executes pull request code.
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  cancel:
+    # `vars` resolves in the caller's repository, so a repository that moved its pool keeps it.
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      # Listing the other open pull requests from the same branch. A private repository refuses
+      # that without this scope.
+      pull-requests: read
+    steps:
+      - name: Force-cancel the closed pull request's runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          # Through the environment, never interpolated into the shell: a branch name is
+          # attacker-controlled text on a fork.
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_LABEL: ${{ github.event.pull_request.head.label }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+
+          # A branch can back several pull requests (`develop` into `main` while another is open).
+          # A run that names no pull request may belong to one of those, so it is left alone.
+          OTHER_OPEN="$(gh api -X GET --paginate "repos/$GH_REPO/pulls" -f state=open -f head="$HEAD_LABEL" \
+            -q "[.[] | select(.number != $PR_NUMBER)] | length" | awk '{ n += $1 } END { print n + 0 }')"
+          export OTHER_OPEN
+
+          # Pull request events only: push, schedule and workflow_dispatch runs are deploys and
+          # must finish. `pull_request_review` runs the same gates on the same branch.
+          # `head_repository` keeps a fork's same-named branch out.
+          ids=""
+          for status in queued in_progress waiting pending requested; do
+            ids+=$'\n'"$(gh api -X GET --paginate "repos/$GH_REPO/actions/runs" -f branch="$HEAD_REF" -f status="$status" -f per_page=100 -q '
+              .workflow_runs[]
+              | select(.id != (env.RUN_ID | tonumber))
+              | select(.event == "pull_request" or .event == "pull_request_target" or .event == "pull_request_review")
+              | select(.head_repository.full_name == env.HEAD_REPO)
+              | select(if (.pull_requests | length) > 0
+                  then any(.pull_requests[]; .number == (env.PR_NUMBER | tonumber))
+                  else env.OTHER_OPEN == "0" end)
+              | .id')"
+          done
+
+          failed=0
+          while read -r id; do
+            [ -n "$id" ] || continue
+            # Force-cancel, not cancel: a plain cancel still starts `if: always()` jobs, which take
+            # a runner again. 409 means the run finished meanwhile.
+            if out="$(gh api -X POST "repos/$GH_REPO/actions/runs/$id/force-cancel" 2>&1)"; then
+              echo "force-cancelled run $id"
+            elif grep -q 'HTTP 409' <<<"$out"; then
+              echo "run $id already finished"
+            else
+              echo "::warning::run $id: $out"
+              failed=1
+            fi
+          done < <(sort -u <<<"$ids")
+          exit "$failed"
