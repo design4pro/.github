@@ -15,7 +15,7 @@ permissions: {}
 jobs:
   cancel:
     # `vars` resolves in the caller's repository, so a repository that moved its pool keeps it.
-    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","gate"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_CI || '["self-hosted","linux","X64","ci"]') }}
     timeout-minutes: 5
     permissions:
       actions: write
